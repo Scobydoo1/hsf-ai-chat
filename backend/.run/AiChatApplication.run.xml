@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="AiChatApplication (local SQL Server)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.hsf.aichat.AiChatApplication" />
+    <module name="ai-chat" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

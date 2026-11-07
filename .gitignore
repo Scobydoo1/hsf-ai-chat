@@ -1,0 +1,23 @@
+# Build output
+target/
+build/
+node_modules/
+dist/
+
+# IDE
+.idea/*
+!.idea/runConfigurations/
+*.iml
+.vscode/
+*.class
+
+# Secrets - never commit real passwords / API keys
+.env
+*.env.local
+
+# Browser test output
+.playwright-mcp/
+
+# OS
+.DS_Store
+Thumbs.db
