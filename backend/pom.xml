@@ -51,6 +51,13 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- H2: the in-memory database of the tests AND the zero-setup "h2" profile (application-h2.properties).
+             Scope runtime, not test, so the app itself can run on it: any computer, no SQL Server needed. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
         <!-- Official Anthropic SDK for the Claude provider (OpenAI-compatible and Gemini use plain HTTP) -->
         <dependency>
@@ -73,15 +80,10 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Tests run on in-memory H2 with the offline Demo provider: no SQL Server, no API key -->
+        <!-- Tests run on in-memory H2 (see above) with the offline Demo provider: no SQL Server, no API key -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

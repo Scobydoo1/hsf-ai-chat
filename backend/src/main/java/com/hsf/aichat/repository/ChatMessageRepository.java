@@ -12,6 +12,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
 
+    /** Only the newest 9 messages, newest first: the history sent to the AI (see ChatService.send) */
+    List<ChatMessage> findTop9ByConversationIdOrderByIdDesc(Long conversationId);
+
     @Transactional
     @Modifying
     @Query("delete from ChatMessage m where m.conversation.id = :conversationId")

@@ -1,0 +1,23 @@
+# Same line endings on Windows, macOS and Linux: Git stores text files with LF
+* text=auto
+
+# Scripts: the shell ones must keep LF (a CRLF breaks ./mvnw on macOS/Linux), the Windows ones CRLF
+mvnw text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary files: never change them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.pdf binary
+*.jar binary

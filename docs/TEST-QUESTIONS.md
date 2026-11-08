@@ -10,9 +10,12 @@ The app loads 4 sample documents on first start (Documents tab). They live in
 | `quy-che-thi-mau.md` | Sample exam regulations of a fictional university (Vietnamese) |
 | `spring-boot-faq.md` | Real Spring Boot / JPA / RAG notes (English) |
 
-Use **New chat → Chat with my documents (RAG)** and ask the questions below.
-With a real provider (e.g. Gemini) the answer should contain the expected fact and a citation like [1].
-With the Demo provider you only see the best passage, which should come from the expected file.
+There is one kind of chat. In the chat box, the **document picker** (left of *Auto-switch*) decides what each question
+searches: keep it on **All documents**, or pick **Choose documents…** and tick the file you are testing, then ask the
+questions below. With a real provider (e.g. Gemini) the answer should contain the expected fact and a yellow citation
+chip like **1**; click it to see the passage. With the Demo provider you only see the best passage, which should come
+from the expected file. The line under each answer shows the platform, the model, the time and how many documents were
+searched.
 
 ## Green Leaf Café (`greenleaf-cafe-handbook.md`)
 
@@ -59,11 +62,34 @@ With the Demo provider you only see the best passage, which should come from the
 | Question | Expected behaviour |
 |----------|--------------------|
 | What is the café's Wi-Fi password this week? | The documents say it is printed on the receipt; it does not invent one |
-| Who won the 2022 World Cup? | In RAG mode: "the documents do not contain this". In normal chat mode: a normal answer |
+| Who won the 2022 World Cup? | With documents on (**All documents**): one short sentence saying the documents do not cover it, then the answer from general knowledge, marked as not from the documents (Argentina). With **Don't use documents**: a normal answer, no citations |
+
+## Choosing documents
+
+1. Document picker → **Choose documents…** → tick only `spring-boot-faq.md`.
+2. Ask *How much is a salted cream coffee, size L?* → the answer says the chosen documents do not contain it, and the
+   line under it says *searched 1 doc*.
+3. On the **Documents** tab click **Ask about this** on `greenleaf-cafe-handbook.md` → the chat box now searches only
+   that file. Ask the same question again → 52,000 VND with a citation.
+4. Pick **Don't use documents** → no sources and no *searched … docs* (the fastest option on the free plan).
 
 ## Switching platforms
 
-1. Ask the same question with Gemini, then switch the **AI:** box (top right) to Groq or Claude and ask again.
+1. Ask the same question with Gemini, then pick Groq or Claude in the AI menu (top right, **✦ Google Gemini ▾**) and
+   ask again.
 2. Each answer shows which provider and model wrote it under the bubble.
-3. Note: switching the *chat* provider never requires re-indexing. Only changing the *embedding* provider does
-   (Documents tab → **Re-index all**).
+3. Note: switching the *chat* provider never requires re-indexing. Only changing the *embedding* provider does, and
+   the app does it by itself in the background (Documents tab: "Updating document search…"; **Re-index all** does it
+   at once).
+
+## Automatic switching (needs two real providers, e.g. Gemini + Groq)
+
+1. Check that *Switch automatically when a platform hits its limit* is on (AI menu or Settings) and that Gemini is the
+   chat platform.
+2. Make Gemini fail: the quickest way is **Edit** → change its chat model to a name that does not exist (e.g.
+   `gemini-0-test`) → **Save**. (On a busy free tier a real HTTP 429 works the same way.)
+3. Ask any question → **Groq** answers, and a pink note under the answer says why, e.g. *"Google Gemini could not find
+   its model, so Groq answered instead."* The AI menu shows Gemini as *resting … s*.
+4. Turn the switch **off** and ask again → an error bubble explains what failed, marks your question *Not sent*, and
+   offers **Retry** and **Ask Groq**. Click **Ask Groq** → the same question is answered once (no duplicate).
+5. Put Gemini's model name back and **Save**: saving ends its rest.

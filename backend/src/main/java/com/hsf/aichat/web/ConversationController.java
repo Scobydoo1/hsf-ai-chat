@@ -43,9 +43,9 @@ public class ConversationController {
         return chatService.messages(id);
     }
 
-    /** Send a message and get the AI's answer */
+    /** Send a message and get the AI's answer (502 with a "code" if every AI failed; then nothing is saved) */
     @PostMapping("/{id}/messages")
     public MessageResponse send(@PathVariable Long id, @Valid @RequestBody SendMessageRequest request) {
-        return chatService.send(id, request.content().trim());
+        return chatService.send(id, request.trimmed());
     }
 }

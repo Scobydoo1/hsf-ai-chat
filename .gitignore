@@ -4,9 +4,13 @@ build/
 node_modules/
 dist/
 
-# IDE
+# Local H2 database of the "h2" profile (AiChatApplication (H2, no setup))
+backend/data/
+
+# IDE (backend/.idea: from opening only the backend folder, as the old instructions said)
 .idea/*
 !.idea/runConfigurations/
+backend/.idea/
 *.iml
 .vscode/
 *.class

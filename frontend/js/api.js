@@ -1,8 +1,11 @@
 // Small wrapper around fetch() for the Spring Boot REST API.
 class ApiError extends Error {
-    constructor(status, message) {
+    constructor(status, message, data = {}) {
         super(message);
-        this.status = status;
+        this.status = status;                   // HTTP status; 0 = no answer (offline, or timed out)
+        this.code = data.code || null;          // 502 only: RATE_LIMIT | UNAVAILABLE | AUTH | NOT_FOUND | AI_ERROR
+        this.provider = data.provider || null;  // 502 only: the platform `code` is about = the one the user chose (tried first)
+        this.timeout = !!data.timeout;
     }
 }
 
@@ -17,7 +20,8 @@ const Api = (() => {
         try { localStorage.setItem('appPassword', value); } catch { /* private mode: ask again next time */ }
     }
 
-    async function request(method, path, body) {
+    /** timeoutMs: give up after this long (0 = wait as long as the browser allows) */
+    async function request(method, path, body, timeoutMs = 0) {
         const headers = {};
         const password = getPassword();
         if (password) headers['X-App-Password'] = password;
@@ -30,18 +34,28 @@ const Api = (() => {
             payload = JSON.stringify(body);
         }
 
+        const controller = new AbortController();
+        const timer = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
         let res;
+        let text;
         try {
-            res = await fetch(base + path, { method, headers, body: payload });
+            res = await fetch(base + path, { method, headers, body: payload, signal: controller.signal });
+            text = await res.text();
         } catch {
-            throw new ApiError(0, `Cannot reach the back-end at ${base}. Is it running? ` +
-                '(On Render’s free plan the first request after a break can take about a minute.)');
+            if (controller.signal.aborted) {
+                throw new ApiError(0, 'The server did not answer in time.', { timeout: true });
+            }
+            throw new ApiError(0, `Cannot reach the server at ${base}. Check your connection, then try again.`);
+        } finally {
+            clearTimeout(timer);
         }
-        if (res.status === 204) return null;
-        const text = await res.text();
+
         let data = null;
         try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-        if (!res.ok) throw new ApiError(res.status, (data && data.error) || `HTTP ${res.status}`);
+        if (!res.ok) {
+            const info = data && typeof data === 'object' ? data : {};
+            throw new ApiError(res.status, info.error || `HTTP ${res.status}`, info);
+        }
         return data;
     }
 
@@ -49,7 +63,7 @@ const Api = (() => {
         base,
         getPassword,
         setPassword,
-        status: () => request('GET', '/api/status'),
+        status: (timeoutMs) => request('GET', '/api/status', undefined, timeoutMs),
 
         providers: () => request('GET', '/api/providers'),
         createProvider: (p) => request('POST', '/api/providers', p),
@@ -59,10 +73,11 @@ const Api = (() => {
         testProvider: (id) => request('POST', `/api/providers/${id}/test`),
 
         conversations: () => request('GET', '/api/conversations'),
-        createConversation: (mode) => request('POST', '/api/conversations', { mode }),
+        createConversation: () => request('POST', '/api/conversations', {}),
         deleteConversation: (id) => request('DELETE', `/api/conversations/${id}`),
         messages: (id) => request('GET', `/api/conversations/${id}/messages`),
-        send: (id, content) => request('POST', `/api/conversations/${id}/messages`, { content }),
+        /** body: { content, useDocuments, documentIds, providerId, autoFallback } */
+        send: (id, body) => request('POST', `/api/conversations/${id}/messages`, body),
 
         documents: () => request('GET', '/api/documents'),
         uploadDocument: (file) => { const f = new FormData(); f.append('file', file); return request('POST', '/api/documents', f); },

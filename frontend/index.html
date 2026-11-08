@@ -1,229 +1,326 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- interactive-widget: on Android the page shrinks when the keyboard opens, so the chat box stays visible -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <title>AI Chat</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230d6efd'/%3E%3Cpath d='M4 5h8v5H8l-3 2v-2H4z' fill='white'/%3E%3C/svg%3E">
+    <meta name="description" content="Ask questions, answered from your own documents with citations, by the AI platform you choose.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%231B2A4A'/%3E%3Crect x='3' y='8.5' width='10' height='3.5' rx='1' fill='%23FFD84D'/%3E%3Cpath d='M4 4h8v3H4z' fill='white'/%3E%3C/svg%3E">
+    <script>
+        // Pick light or dark before the page is drawn, so it never flashes.
+        // Saved choice: "light", "dark" or "auto" (default: follow the computer's setting).
+        (function () {
+            var choice = 'auto';
+            try { choice = localStorage.getItem('theme') || 'auto'; } catch (e) { /* storage blocked */ }
+            var dark = choice === 'dark' || (choice === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
+        })();
+    </script>
+    <!-- Two font families only (fast first load): Bricolage Grotesque for big titles, Be Vietnam Pro (Vietnamese-friendly) for text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin> <!-- the icon font is a CORS download -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600&family=Bricolage+Grotesque:wght@700&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- ============ Navbar: tabs + quick provider switch ============ -->
-<nav class="navbar navbar-expand navbar-dark bg-dark px-3">
-    <span class="navbar-brand fw-semibold"><i class="bi bi-robot"></i><span class="d-none d-sm-inline"> AI Chat</span></span>
-    <ul class="nav nav-pills flex-nowrap me-auto" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-chat" type="button" role="tab">
-                <i class="bi bi-chat-dots"></i><span class="d-none d-sm-inline"> Chat</span></button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="docs-tab-btn" data-bs-toggle="tab" data-bs-target="#tab-docs" type="button" role="tab">
-                <i class="bi bi-journal-text"></i><span class="d-none d-sm-inline"> Documents</span></button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="settings-tab-btn" data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
-                <i class="bi bi-gear"></i><span class="d-none d-sm-inline"> Settings</span></button>
-        </li>
-    </ul>
-    <div class="d-flex align-items-center gap-2">
-        <label for="providerSwitch" class="text-white-50 small d-none d-md-inline">AI:</label>
-        <select id="providerSwitch" class="form-select form-select-sm provider-switch" title="Switch AI platform"></select>
-    </div>
-</nav>
+<!-- ============ Top bar: wordmark, tabs, server status, AI switch, theme ============ -->
+<header class="app-nav">
+    <p class="brand">AI <span class="swipe">Chat</span></p>
 
-<div class="tab-content flex-grow-1 d-flex flex-column overflow-hidden">
+    <nav class="nav app-tabs" role="tablist" aria-label="Sections">
+        <button class="nav-link active" id="chatTabBtn" data-bs-toggle="tab" data-bs-target="#tab-chat" type="button"
+                role="tab" aria-controls="tab-chat" aria-selected="true">
+            <i class="bi bi-chat-left-text" aria-hidden="true"></i><span>Chat</span></button>
+        <button class="nav-link" id="docsTabBtn" data-bs-toggle="tab" data-bs-target="#tab-docs" type="button"
+                role="tab" aria-controls="tab-docs" aria-selected="false">
+            <i class="bi bi-journal-text" aria-hidden="true"></i><span>Documents</span></button>
+        <button class="nav-link" id="settingsTabBtn" data-bs-toggle="tab" data-bs-target="#tab-settings" type="button"
+                role="tab" aria-controls="tab-settings" aria-selected="false">
+            <i class="bi bi-gear" aria-hidden="true"></i><span>Settings</span></button>
+    </nav>
+
+    <div class="nav-tools">
+        <!-- Is the (free, sleepy) server awake? -->
+        <span id="serverStatus" class="server-status" data-state="connecting" role="status">
+            <span class="dot" aria-hidden="true"></span><span id="serverStatusLabel" class="label">Connecting…</span>
+        </span>
+
+        <!-- Quick switch: which AI platform answers -->
+        <div class="dropdown">
+            <button id="aiPill" class="pill ai-pill" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                    aria-expanded="false">
+                <i class="bi bi-stars" aria-hidden="true"></i>
+                <span class="visually-hidden">AI platform: </span><span id="aiPillName" class="name">Loading…</span>
+                <i class="bi bi-chevron-down caret" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end ai-menu">
+                <p class="menu-label">Answer with</p>
+                <div id="providerMenu"></div>
+                <div class="dropdown-divider"></div>
+                <div class="form-check form-switch menu-switch">
+                    <input id="autoSwitchNav" class="form-check-input" type="checkbox" role="switch" data-auto-switch>
+                    <label class="form-check-label" for="autoSwitchNav">Switch automatically when a platform hits its limit</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Light / dark / auto -->
+        <div class="dropdown">
+            <button id="themeBtn" class="icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                    aria-label="Theme" title="Theme">
+                <i id="themeIcon" class="bi bi-circle-half" aria-hidden="true"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end theme-menu">
+                <li><button class="dropdown-item" type="button" data-theme="light"><i class="bi bi-sun" aria-hidden="true"></i> Light
+                    <i class="bi bi-check2 current-check" aria-hidden="true"></i></button></li>
+                <li><button class="dropdown-item" type="button" data-theme="dark"><i class="bi bi-moon-stars" aria-hidden="true"></i> Dark
+                    <i class="bi bi-check2 current-check" aria-hidden="true"></i></button></li>
+                <li><button class="dropdown-item" type="button" data-theme="auto"><i class="bi bi-circle-half" aria-hidden="true"></i> Auto
+                    <i class="bi bi-check2 current-check" aria-hidden="true"></i></button></li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<!-- Shown while the free server wakes up (or when it cannot be reached) -->
+<div id="wakeBanner" class="wake-banner" role="status" hidden>
+    <div class="wake-inner">
+        <i class="bi bi-cup-hot wake-icon" aria-hidden="true"></i>
+        <div class="wake-text">
+            <p id="wakeTitle" class="wake-title">Waking up the free server…</p>
+            <p id="wakeBody" class="wake-body">The free plan sleeps after 15 minutes without visitors; the first request takes up to a minute.</p>
+        </div>
+        <button id="wakeRetry" class="btn btn-sm btn-primary" type="button" hidden>Try again</button>
+    </div>
+    <div class="wake-progress" aria-hidden="true"><span></span></div>
+</div>
+
+<main class="tab-content app-main">
 
     <!-- ============ CHAT ============ -->
-    <div class="tab-pane fade show active h-100" id="tab-chat" role="tabpanel">
-        <div class="d-flex h-100">
-            <!-- conversation list (slides in on small screens) -->
-            <aside class="offcanvas-md offcanvas-start sidebar border-end bg-body-tertiary" tabindex="-1" id="sidebar">
-                <div class="offcanvas-header d-md-none">
-                    <h2 class="offcanvas-title h5">Conversations</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close"></button>
-                </div>
-                <div class="p-3 d-flex flex-column gap-2 h-100">
-                    <div class="dropdown d-grid">
-                        <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" type="button">
-                            <i class="bi bi-plus-lg"></i> New chat
+    <section class="tab-pane fade show active" id="tab-chat" role="tabpanel" aria-labelledby="chatTabBtn">
+        <!-- conversation list (slides in on small screens) -->
+        <aside class="offcanvas-md offcanvas-start sidebar" tabindex="-1" id="sidebar" aria-labelledby="sidebarTitle">
+            <div class="offcanvas-header d-md-none">
+                <h2 id="sidebarTitle" class="offcanvas-title h6 mb-0">Conversations</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close"></button>
+            </div>
+            <div class="sidebar-inner">
+                <button id="newChatBtn" class="btn btn-primary w-100" type="button">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i> New chat
+                </button>
+                <nav id="conversationList" class="conversations" aria-label="Conversations"></nav>
+            </div>
+        </aside>
+
+        <div class="chat">
+            <div class="chat-head">
+                <button class="icon-btn d-md-none" data-bs-toggle="offcanvas" data-bs-target="#sidebar" type="button"
+                        aria-label="Show conversations"><i class="bi bi-list" aria-hidden="true"></i></button>
+                <h1 id="chatTitle" class="chat-title">New chat</h1>
+                <button id="scopeSummary" class="pill pill-quiet scope-summary" type="button" title="Documents the next question searches">
+                    <i class="bi bi-journal-text" aria-hidden="true"></i><span id="scopeSummaryLabel">All documents</span>
+                </button>
+            </div>
+
+            <div id="messages" class="messages">
+                <div id="thread" class="thread" role="log" aria-live="polite"></div>
+            </div>
+
+            <div class="composer-wrap">
+                <form id="sendForm" class="composer">
+                    <label for="messageInput" class="visually-hidden">Your question</label>
+                    <textarea id="messageInput" rows="1" maxlength="20000" placeholder="Ask a question…"
+                              aria-describedby="composerHint"></textarea>
+                    <div class="composer-bar">
+                        <!-- Which documents to search (requirement: no need to search all) -->
+                        <div class="dropdown dropup">
+                            <button id="scopeBtn" class="pill scope-btn" type="button" data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside" aria-expanded="false">
+                                <i class="bi bi-journal-text" aria-hidden="true"></i>
+                                <span class="visually-hidden">Documents: </span><span id="scopeLabel">All documents</span>
+                                <i class="bi bi-chevron-down caret" aria-hidden="true"></i>
+                            </button>
+                            <div id="scopeMenu" class="dropdown-menu scope-menu">
+                                <p class="menu-label">Documents to search</p>
+                                <label class="scope-option">
+                                    <input class="form-check-input" type="radio" name="scopeMode" value="none">
+                                    <span><span class="opt-title">Don't use documents</span><span class="opt-help">Plain chat, fastest</span></span>
+                                </label>
+                                <label class="scope-option">
+                                    <input class="form-check-input" type="radio" name="scopeMode" value="all">
+                                    <span><span class="opt-title">All documents<span id="scopeAllCount"></span></span><span class="opt-help">Searches every file</span></span>
+                                </label>
+                                <label class="scope-option">
+                                    <input class="form-check-input" type="radio" name="scopeMode" value="choose">
+                                    <span><span class="opt-title">Choose documents…</span><span class="opt-help">Only the files you tick</span></span>
+                                </label>
+                                <div id="scopeDocs" class="scope-docs" hidden></div>
+                            </div>
+                        </div>
+
+                        <button id="autoSwitchBtn" class="pill auto-btn" type="button" aria-pressed="true"
+                                title="Switch AI platform automatically when one hits its limit">
+                            <i class="bi bi-lightning-charge-fill" aria-hidden="true"></i><span class="label">Auto-switch on</span>
                         </button>
-                        <ul class="dropdown-menu w-100">
-                            <li><button class="dropdown-item" type="button" data-new-chat="CHAT">
-                                <i class="bi bi-chat"></i> Chat with AI</button></li>
-                            <li><button class="dropdown-item" type="button" data-new-chat="RAG">
-                                <i class="bi bi-journal-text"></i> Chat with my documents (RAG)</button></li>
-                        </ul>
-                    </div>
-                    <div id="conversationList" class="list-group list-group-flush overflow-auto flex-grow-1"></div>
-                </div>
-            </aside>
 
-            <!-- messages -->
-            <section class="d-flex flex-column flex-grow-1 min-w-0">
-                <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
-                    <button class="btn btn-sm btn-outline-secondary d-md-none" data-bs-toggle="offcanvas" data-bs-target="#sidebar"
-                            type="button" aria-label="Show conversations"><i class="bi bi-list"></i></button>
-                    <h1 id="chatTitle" class="h6 mb-0 text-truncate">Start a new chat</h1>
-                    <span id="chatMode" class="badge d-none"></span>
-                </div>
-
-                <div id="messages" class="flex-grow-1 overflow-auto px-3 py-4">
-                    <div class="empty-state text-center text-body-secondary">
-                        <i class="bi bi-chat-square-text display-4"></i>
-                        <p class="mt-3 mb-1">Pick <b>New chat</b> to start.</p>
-                        <p class="small">“Chat with my documents” answers from the files on the <b>Documents</b> tab.</p>
-                    </div>
-                </div>
-
-                <form id="sendForm" class="border-top p-3">
-                    <div class="input-group">
-                        <textarea id="messageInput" class="form-control" rows="1" placeholder="Type a message… (Enter to send, Shift+Enter for a new line)"
-                                  disabled></textarea>
-                        <button id="sendBtn" class="btn btn-primary" type="submit" disabled>
-                            <i class="bi bi-send"></i><span class="d-none d-sm-inline"> Send</span>
+                        <button id="sendBtn" class="btn btn-primary send-btn" type="submit" disabled>
+                            <span>Send</span><i class="bi bi-arrow-up" aria-hidden="true"></i>
                         </button>
+                    </div>
+                </form>
+                <p id="composerHint" class="composer-hint">Enter sends · Shift + Enter adds a line</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ DOCUMENTS (the knowledge base the AI can search) ============ -->
+    <section class="tab-pane fade" id="tab-docs" role="tabpanel" aria-labelledby="docsTabBtn">
+        <div class="page">
+            <header class="page-head">
+                <div>
+                    <h1 class="page-title">Documents</h1>
+                    <p class="page-lead">The AI can answer from these files. Choose which ones to use in the chat box.</p>
+                </div>
+                <button id="reindexBtn" class="btn btn-outline-secondary btn-sm" type="button">
+                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Re-index all
+                </button>
+            </header>
+
+            <!-- a still icon, not a spinner: the only endless animation on the page is the "waking up" one -->
+            <p id="reindexNote" class="reindex-note" role="status" hidden>
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                <span><b>Updating document search…</b> Files embedded with an older model are being re-indexed in the background.</span>
+            </p>
+            <p id="embeddingInfo" class="info-line"></p>
+
+            <div class="doc-add">
+                <label id="dropZone" class="dropzone" for="fileInput">
+                    <i class="bi bi-cloud-arrow-up dz-icon" aria-hidden="true"></i>
+                    <span id="dropTitle" class="dz-title">Drop a file here, or click to choose</span>
+                    <span class="dz-help">PDF, TXT, Markdown, CSV, JSON, HTML. Max 10 MB.</span>
+                    <input id="fileInput" class="visually-hidden" type="file" accept=".pdf,.txt,.md,.csv,.json,.html,.xml">
+                </label>
+
+                <details class="paste">
+                    <summary><i class="bi bi-clipboard-plus" aria-hidden="true"></i> Paste text instead
+                        <i class="bi bi-chevron-down caret" aria-hidden="true"></i></summary>
+                    <form id="textForm" class="paste-form">
+                        <div>
+                            <label class="form-label" for="textName">Name</label>
+                            <input id="textName" class="form-control" placeholder="e.g. course-rules.txt" required maxlength="200">
+                        </div>
+                        <div>
+                            <label class="form-label" for="textContent">Text</label>
+                            <textarea id="textContent" class="form-control" rows="5" placeholder="Paste the text here" required></textarea>
+                        </div>
+                        <div><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add text</button></div>
+                    </form>
+                </details>
+            </div>
+
+            <h2 class="section-title">Your documents <span id="docCount" class="count"></span></h2>
+            <div id="documentGrid" class="doc-grid"></div>
+        </div>
+    </section>
+
+    <!-- ============ SETTINGS (AI platforms + API keys) ============ -->
+    <section class="tab-pane fade" id="tab-settings" role="tabpanel" aria-labelledby="settingsTabBtn">
+        <div class="page">
+            <header class="page-head">
+                <div>
+                    <h1 class="page-title">AI platforms</h1>
+                    <p class="page-lead"><b>Use for chat</b> picks the platform that answers. <b>Embeddings</b> marks the platform
+                        that reads your documents for vector search. Keys are stored encrypted on the server and never sent back in full.</p>
+                </div>
+            </header>
+
+            <div id="providerGrid" class="provider-grid"></div>
+
+            <div class="settings-notes">
+                <section class="surface">
+                    <h2 class="section-title"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Automatic switching</h2>
+                    <div class="form-check form-switch">
+                        <input id="autoSwitchSettings" class="form-check-input" type="checkbox" role="switch" data-auto-switch>
+                        <label class="form-check-label" for="autoSwitchSettings">Switch automatically when a platform hits its limit</label>
+                    </div>
+                    <p class="note">If the platform you chose hits its free-tier limit or stops responding, the next working platform
+                        answers and the answer says so. The offline demo is never used for this.</p>
+                </section>
+                <section class="surface">
+                    <h2 class="section-title"><i class="bi bi-cup-hot" aria-hidden="true"></i> Free hosting</h2>
+                    <p class="note">While this tab is open and visible, the app checks the server every 9 minutes, so the free server
+                        does not fall asleep during a demo.</p>
+                </section>
+            </div>
+
+            <section class="surface" id="providerFormCard">
+                <h2 id="providerFormTitle" class="section-title">Add a platform</h2>
+                <form id="providerForm" class="row g-3">
+                    <input type="hidden" id="pId">
+                    <div class="col-md-4">
+                        <label class="form-label" for="pPreset">Start from a preset</label>
+                        <select id="pPreset" class="form-select"></select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="pName">Name</label>
+                        <input id="pName" class="form-control" required maxlength="100">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="pType">API type</label>
+                        <select id="pType" class="form-select" required>
+                            <option value="GEMINI">Google Gemini</option>
+                            <option value="OPENAI_COMPATIBLE">OpenAI-compatible (OpenAI, Groq, Ollama…)</option>
+                            <option value="ANTHROPIC">Anthropic Claude</option>
+                            <option value="DEMO">Demo (offline)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="pBaseUrl">Base URL <span class="text-body-secondary small">(empty = default)</span></label>
+                        <input id="pBaseUrl" class="form-control" maxlength="300" placeholder="https://api.openai.com/v1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="pModel">Chat model</label>
+                        <input id="pModel" class="form-control mono-input" required maxlength="100">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="pEmbeddingModel">Embedding model</label>
+                        <input id="pEmbeddingModel" class="form-control mono-input" maxlength="100" placeholder="empty = none">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="pApiKey">API key</label>
+                        <input id="pApiKey" class="form-control" type="password" autocomplete="off" maxlength="500">
+                        <div id="pKeyHelp" class="form-text"></div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check">
+                            <input id="pUseForEmbeddings" class="form-check-input" type="checkbox">
+                            <label class="form-check-label" for="pUseForEmbeddings">Use for embeddings (document search)</label>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> Save</button>
+                        <button id="providerCancel" class="btn btn-outline-secondary" type="button">Clear</button>
                     </div>
                 </form>
             </section>
         </div>
-    </div>
+    </section>
+</main>
 
-    <!-- ============ DOCUMENTS (RAG knowledge base) ============ -->
-    <div class="tab-pane fade overflow-auto" id="tab-docs" role="tabpanel">
-        <div class="container py-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <h1 class="h4 mb-0">Documents for RAG</h1>
-                <button id="reindexBtn" class="btn btn-outline-secondary btn-sm" type="button">
-                    <i class="bi bi-arrow-repeat"></i> Re-index all
-                </button>
-            </div>
-            <div id="embeddingInfo" class="alert alert-info small"></div>
-
-            <div class="row g-3 mb-4">
-                <div class="col-lg-5">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h2 class="h6">Upload a file</h2>
-                            <form id="uploadForm" class="d-flex flex-column gap-2">
-                                <input id="fileInput" class="form-control" type="file" accept=".pdf,.txt,.md,.csv,.json,.html,.xml" required>
-                                <div class="form-text">PDF, TXT, Markdown, CSV, JSON, HTML. Max 10 MB.</div>
-                                <button class="btn btn-primary" type="submit"><i class="bi bi-upload"></i> Upload</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-7">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h2 class="h6">…or paste text</h2>
-                            <form id="textForm" class="d-flex flex-column gap-2">
-                                <input id="textName" class="form-control" placeholder="Name, e.g. course-rules.txt" required maxlength="200">
-                                <textarea id="textContent" class="form-control" rows="4" placeholder="Paste the text here" required></textarea>
-                                <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg"></i> Add text</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="table-light">
-                        <tr><th>Name</th><th class="text-end">Characters</th><th class="text-end">Chunks</th><th>Search</th><th></th></tr>
-                        </thead>
-                        <tbody id="documentRows"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ SETTINGS (providers + API keys) ============ -->
-    <div class="tab-pane fade overflow-auto" id="tab-settings" role="tabpanel">
-        <div class="container py-4">
-            <h1 class="h4 mb-3">AI platforms and API keys</h1>
-            <p class="text-body-secondary small">
-                <b>Use for chat</b> picks the platform that answers. <b>Embeddings</b> picks the platform that turns documents
-                into vectors for RAG. Keys are stored encrypted on the server and never sent back in full.
-            </p>
-
-            <div class="card mb-4">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="table-light">
-                        <tr><th>Name</th><th>Type</th><th>Model</th><th>API key</th><th>Status</th><th class="text-end">Actions</th></tr>
-                        </thead>
-                        <tbody id="providerRows"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <h2 id="providerFormTitle" class="h6 mb-3">Add a platform</h2>
-                    <form id="providerForm" class="row g-3">
-                        <input type="hidden" id="pId">
-                        <div class="col-md-4">
-                            <label class="form-label" for="pPreset">Start from a preset</label>
-                            <select id="pPreset" class="form-select"></select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="pName">Name</label>
-                            <input id="pName" class="form-control" required maxlength="100">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="pType">API type</label>
-                            <select id="pType" class="form-select" required>
-                                <option value="GEMINI">Google Gemini</option>
-                                <option value="OPENAI_COMPATIBLE">OpenAI-compatible (OpenAI, Groq, Ollama…)</option>
-                                <option value="ANTHROPIC">Anthropic Claude</option>
-                                <option value="DEMO">Demo (offline)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="pBaseUrl">Base URL <span class="text-body-secondary small">(empty = default)</span></label>
-                            <input id="pBaseUrl" class="form-control" maxlength="300" placeholder="https://api.openai.com/v1">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label" for="pModel">Chat model</label>
-                            <input id="pModel" class="form-control" required maxlength="100">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label" for="pEmbeddingModel">Embedding model</label>
-                            <input id="pEmbeddingModel" class="form-control" maxlength="100" placeholder="empty = none">
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label" for="pApiKey">API key</label>
-                            <input id="pApiKey" class="form-control" type="password" autocomplete="off" maxlength="500">
-                            <div id="pKeyHelp" class="form-text"></div>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <div class="form-check">
-                                <input id="pUseForEmbeddings" class="form-check-input" type="checkbox">
-                                <label class="form-check-label" for="pUseForEmbeddings">Use for embeddings (RAG)</label>
-                            </div>
-                        </div>
-                        <div class="col-12 d-flex gap-2">
-                            <button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Save</button>
-                            <button id="providerCancel" class="btn btn-outline-secondary" type="button">Clear</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Toast for messages -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="toast" class="toast align-items-center border-0" role="status" aria-live="polite" aria-atomic="true">
-        <div class="d-flex">
+<!-- Toast for short messages -->
+<div class="toast-spot">
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+        <div class="toast-inner">
+            <i id="toastIcon" class="bi bi-check2-circle" aria-hidden="true"></i>
             <div id="toastBody" class="toast-body"></div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     </div>
 </div>
@@ -232,11 +329,12 @@
 <div class="modal fade" id="passwordModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="passwordTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <form id="passwordForm" class="modal-content">
-            <div class="modal-header"><h2 id="passwordTitle" class="modal-title h5"><i class="bi bi-lock"></i> App password</h2></div>
+            <div class="modal-header"><h2 id="passwordTitle" class="modal-title h5"><i class="bi bi-lock" aria-hidden="true"></i> App password</h2></div>
             <div class="modal-body">
                 <p class="small text-body-secondary">This server is protected. Enter the password your group set in APP_PASSWORD.</p>
+                <label for="passwordInput" class="visually-hidden">Password</label>
                 <input id="passwordInput" class="form-control" type="password" required autocomplete="current-password">
-                <div id="passwordError" class="text-danger small mt-2 d-none">Wrong password</div>
+                <div id="passwordError" class="password-error small mt-2 d-none">Wrong password. Try again.</div>
             </div>
             <div class="modal-footer"><button class="btn btn-primary w-100" type="submit">Unlock</button></div>
         </form>
@@ -247,7 +345,12 @@
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="js/config.js"></script>
-<script src="js/api.js"></script>
-<script src="js/app.js"></script>
+<script src="js/api.js"></script>       <!-- fetch wrapper -->
+<script src="js/ui.js"></script>        <!-- shared state, helpers, toast, password, theme -->
+<script src="js/messages.js"></script>  <!-- message bubbles, citations, source cards -->
+<script src="js/chat.js"></script>      <!-- conversations, document scope, composer, sending -->
+<script src="js/documents.js"></script> <!-- Documents tab -->
+<script src="js/settings.js"></script>  <!-- AI platforms: navbar switch + Settings tab -->
+<script src="js/app.js"></script>       <!-- start-up, waking the server, keep-awake -->
 </body>
 </html>

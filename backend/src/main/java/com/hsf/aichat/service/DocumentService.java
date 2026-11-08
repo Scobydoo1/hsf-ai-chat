@@ -1,5 +1,6 @@
 package com.hsf.aichat.service;
 
+import com.hsf.aichat.ai.AiException;
 import com.hsf.aichat.entity.DocumentChunk;
 import com.hsf.aichat.entity.KnowledgeDocument;
 import com.hsf.aichat.entity.ProviderConfig;
@@ -14,6 +15,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -23,6 +25,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+
+import static com.hsf.aichat.web.dto.Dtos.withZone;
 
 /**
  * The knowledge base for RAG: read a file, split it into chunks, embed each chunk, save to the database.
@@ -35,16 +39,20 @@ public class DocumentService {
     private final KnowledgeDocumentRepository documentRepository;
     private final DocumentChunkRepository chunkRepository;
     private final ProviderService providerService;
+    private final TransactionTemplate transactions;
 
     public DocumentService(KnowledgeDocumentRepository documentRepository, DocumentChunkRepository chunkRepository,
-                           ProviderService providerService) {
+                           ProviderService providerService, TransactionTemplate transactions) {
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
         this.providerService = providerService;
+        this.transactions = transactions;
     }
 
     public List<DocumentResponse> list() {
-        return documentRepository.findAllByOrderByIdDesc().stream().map(DocumentService::toResponse).toList();
+        // look up the current embedding model once, then compare every document with it
+        String currentKey = providerService.embeddingProvider().map(ProviderService::embeddingKey).orElse(null);
+        return documentRepository.findAllByOrderByIdDesc().stream().map(d -> toResponse(d, currentKey)).toList();
     }
 
     public UploadResponse upload(MultipartFile file) throws IOException {
@@ -79,7 +87,8 @@ public class DocumentService {
         chunkRepository.saveAll(chunks);
         doc.setChunkCount(chunks.size());
         documentRepository.save(doc);
-        return new UploadResponse(toResponse(doc), warning);
+        // just embedded with the current model (or not at all, see the warning)
+        return new UploadResponse(toResponse(doc, doc.getEmbeddingModel()), warning);
     }
 
     public void delete(Long id) {
@@ -111,6 +120,35 @@ public class DocumentService {
         return new ReindexResponse(docs.size(), total, ProviderService.embeddingKey(embedder.get()));
     }
 
+    /**
+     * Re-embeds one document with the current embedding provider (used by the background re-index).
+     * The AI call comes first and no transaction is open during it. If it fails, the exception goes up
+     * and nothing is changed, so the document keeps its old vectors.
+     */
+    public void reembed(KnowledgeDocument doc) {
+        ProviderConfig cfg = providerService.embeddingProvider()
+                .orElseThrow(() -> new IllegalStateException("No embedding provider is set"));
+        List<DocumentChunk> chunks = chunkRepository.findByDocumentIdOrderByChunkIndexAsc(doc.getId());
+        if (chunks.isEmpty()) {
+            return;
+        }
+        List<float[]> vectors = providerService.implementation(cfg)
+                .embed(cfg, chunks.stream().map(DocumentChunk::getContent).toList()); // one batch call
+        if (vectors.size() != chunks.size()) {
+            throw new AiException(cfg.getName() + " returned " + vectors.size() + " vectors for " + chunks.size() + " chunks");
+        }
+        String key = ProviderService.embeddingKey(cfg);
+        for (int i = 0; i < chunks.size(); i++) {
+            chunks.get(i).setEmbedding(VectorMath.toBytes(vectors.get(i)));
+            chunks.get(i).setEmbeddingModel(key);
+        }
+        // one short transaction: the new vectors and the document's model change together
+        transactions.executeWithoutResult(status -> {
+            chunkRepository.saveAll(chunks);
+            documentRepository.updateEmbeddingModel(doc.getId(), key);
+        });
+    }
+
     /** Fills in the vectors. Returns a warning (and keeps keyword search) if embedding is not possible. */
     private String embed(KnowledgeDocument doc, List<DocumentChunk> chunks) {
         Optional<ProviderConfig> embedder = providerService.embeddingProvider();
@@ -136,8 +174,20 @@ public class DocumentService {
         }
     }
 
-    private static DocumentResponse toResponse(KnowledgeDocument d) {
+    private static DocumentResponse toResponse(KnowledgeDocument d, String currentEmbeddingKey) {
         return new DocumentResponse(d.getId(), d.getName(), d.getCharCount(), d.getChunkCount(), d.getEmbeddingModel(),
-                d.getCreatedAt());
+                withZone(d.getCreatedAt()), searchMode(d, currentEmbeddingKey));
+    }
+
+    /**
+     * How questions about this document are searched: "vector" = embedded with the current embedding model,
+     * "outdated" = embedded with another model (re-indexed in the background), "keyword" = no usable vectors
+     * (no embedding provider, or embedding failed).
+     */
+    static String searchMode(KnowledgeDocument d, String currentEmbeddingKey) {
+        if (d.getEmbeddingModel() == null || currentEmbeddingKey == null) {
+            return "keyword";
+        }
+        return d.getEmbeddingModel().equals(currentEmbeddingKey) ? "vector" : "outdated";
     }
 }

@@ -129,6 +129,24 @@ class AiChatApplicationTests {
         assertThat(chunks).allMatch(c -> c.length() <= TextChunker.CHUNK_SIZE);
     }
 
+    @Test
+    void malformedJsonIsABadRequestNotAServerError() throws Exception {
+        long id = createConversation("CHAT");
+        mvc.perform(post("/api/conversations/" + id + "/messages").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("The request body is not valid JSON"));
+    }
+
+    @Test
+    void timesAreSentWithTheirTimeZoneOffset() throws Exception {
+        // e.g. "2026-11-08T03:30:00.123Z": browsers then group chats by the USER's day, not the server's (UTC on Render)
+        long id = createConversation("CHAT");
+        mvc.perform(get("/api/conversations"))
+                .andExpect(jsonPath("$[?(@.id == " + id + ")].updatedAt")
+                        .value(hasItem(matchesPattern(".*T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"))));
+    }
+
     private long createConversation(String mode) throws Exception {
         String res = mvc.perform(post("/api/conversations").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"mode\":\"" + mode + "\"}"))

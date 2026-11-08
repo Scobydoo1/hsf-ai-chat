@@ -62,6 +62,11 @@ public class OpenAiCompatibleProvider implements ChatProvider {
             for (JsonNode item : json.path("data")) {
                 ordered[item.path("index").asInt()] = HttpSupport.toFloats(item.path("embedding"));
             }
+            for (float[] vector : ordered) {
+                if (vector == null) {
+                    throw new AiException(config.getName() + " returned fewer embeddings than texts sent");
+                }
+            }
             result.addAll(List.of(ordered));
         }
         return result;

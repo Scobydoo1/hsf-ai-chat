@@ -1,6 +1,7 @@
 package com.hsf.aichat.web;
 
 import com.hsf.aichat.service.DocumentService;
+import com.hsf.aichat.service.EmbeddingMaintenance;
 import com.hsf.aichat.web.dto.Dtos.DocumentResponse;
 import com.hsf.aichat.web.dto.Dtos.ReindexResponse;
 import com.hsf.aichat.web.dto.Dtos.TextDocumentRequest;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,9 +22,11 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService service;
+    private final EmbeddingMaintenance embeddingMaintenance;
 
-    public DocumentController(DocumentService service) {
+    public DocumentController(DocumentService service, EmbeddingMaintenance embeddingMaintenance) {
         this.service = service;
+        this.embeddingMaintenance = embeddingMaintenance;
     }
 
     @GetMapping
@@ -48,8 +52,13 @@ public class DocumentController {
         service.delete(id);
     }
 
+    /** "Re-index all". Refused (409) while the background re-index runs: same chunks, and the free quota is small */
     @PostMapping("/reindex")
     public ReindexResponse reindex() {
+        if (embeddingMaintenance.isRunning()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "The document search is already being updated in the background. Try again in a minute.");
+        }
         return service.reindex();
     }
 }

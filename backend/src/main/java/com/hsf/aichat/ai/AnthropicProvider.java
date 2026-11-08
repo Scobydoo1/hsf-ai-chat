@@ -3,6 +3,8 @@ package com.hsf.aichat.ai;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.core.JsonValue;
+import com.anthropic.errors.AnthropicIoException;
+import com.anthropic.errors.AnthropicRetryableException;
 import com.anthropic.errors.AnthropicServiceException;
 import com.anthropic.models.beta.AnthropicBeta;
 import com.anthropic.models.beta.messages.BetaMessage;
@@ -40,7 +42,7 @@ public class AnthropicProvider implements ChatProvider {
     @Override
     public String chat(ProviderConfig config, String systemPrompt, List<AiMessage> messages) {
         if (config.getApiKey() == null || config.getApiKey().isBlank()) {
-            throw new AiException(config.getName() + ": API key is missing");
+            throw new AiException(config.getName() + ": API key is missing", null, AiException.Kind.AUTH, null, null);
         }
         MessageCreateParams.Builder params = MessageCreateParams.builder()
                 .model(config.getModel())
@@ -65,13 +67,21 @@ public class AnthropicProvider implements ChatProvider {
         try {
             response = client(config).beta().messages().create(params.build());
         } catch (AnthropicServiceException e) {
-            String hint = switch (e.statusCode()) {
+            int status = e.statusCode();
+            String hint = switch (status) {
                 case 401, 403 -> " (check the API key)";
                 case 404 -> " (check the model name)";
                 case 429 -> " (rate limit reached, try again later)";
                 default -> "";
             };
-            throw new AiException(config.getName() + " returned HTTP " + e.statusCode() + hint + ": " + e.getMessage(), e);
+            // 429 = rate limit, 529 "overloaded" and other 5xx = unavailable (same rules as the other platforms)
+            String retryAfter = e.headers().values("retry-after").stream().findFirst().orElse(null);
+            throw new AiException(config.getName() + " returned HTTP " + status + hint + ": " + e.getMessage(), e,
+                    HttpSupport.kindOf(status), status, HttpSupport.retryAfter(retryAfter, null));
+        } catch (AnthropicIoException | AnthropicRetryableException e) {
+            // could not connect, or the request timed out
+            throw new AiException(config.getName() + " request failed: " + e.getMessage(), e,
+                    AiException.Kind.UNAVAILABLE, null, null);
         } catch (Exception e) {
             throw new AiException(config.getName() + " request failed: " + e.getMessage(), e);
         }
@@ -92,7 +102,9 @@ public class AnthropicProvider implements ChatProvider {
     private AnthropicClient client(ProviderConfig config) {
         String base = config.getBaseUrl() == null ? "" : config.getBaseUrl().trim();
         return clients.computeIfAbsent(base + "|" + config.getApiKey(), k -> {
-            AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder().apiKey(config.getApiKey());
+            AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder()
+                    .apiKey(config.getApiKey())
+                    .maxRetries(1); // retry once at most (the SDK default is 2): on a limit the app switches AI instead
             if (!base.isEmpty()) {
                 builder.baseUrl(base);
             }
