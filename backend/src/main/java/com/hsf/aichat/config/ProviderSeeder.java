@@ -46,7 +46,7 @@ public class ProviderSeeder implements CommandLineRunner {
         seed("GEMINI_API_KEY", "Google Gemini", ProviderType.GEMINI, null, "gemini-3.8-flash", "gemini-embedding-001");
         seed("OPENAI_API_KEY", "OpenAI", ProviderType.OPENAI_COMPATIBLE, "https://api.openai.com/v1", "gpt-5-mini", "text-embedding-3-small");
         seed("ANTHROPIC_API_KEY", "Anthropic Claude", ProviderType.ANTHROPIC, null, "claude-opus-5-5", null);
-        seed("GROQ_API_KEY", "Groq", ProviderType.OPENAI_COMPATIBLE, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", null);
+        seed("GROQ_API_KEY", "Groq", ProviderType.OPENAI_COMPATIBLE, "https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", null);
     }
 
     private void seed(String envVar, String name, ProviderType type, String baseUrl, String model, String embeddingModel) {

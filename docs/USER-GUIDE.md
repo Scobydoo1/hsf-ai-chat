@@ -102,7 +102,7 @@ Other ways to serve the folder: `cd frontend` → `python -m http.server 5500` �
 | Platform | Free? | Get a key | Chat model (preset) | Embeddings |
 |----------|-------|-----------|---------------------|------------|
 | Google Gemini | Free tier | <https://aistudio.google.com/apikey> | `gemini-3.8-flash` | `gemini-embedding-001` ✅ |
-| Groq | Free tier | <https://console.groq.com/keys> | `llama-3.3-70b-versatile` | ❌ |
+| Groq | Free tier | <https://console.groq.com/keys> | `qwen/qwen3.8-27b` | ❌ |
 | OpenAI | Paid | <https://platform.openai.com/api-keys> | `gpt-5-mini` | `text-embedding-3-small` ✅ |
 | Anthropic Claude | Paid | <https://console.anthropic.com/settings/keys> | `claude-opus-5-5` | ❌ |
 | Ollama | Free, runs on your PC | <https://ollama.com/download> | `llama3.2` | `nomic-embed-text` ✅ |
@@ -257,7 +257,7 @@ Answer (200):
 ```jsonc
 {
   "id": 42, "role": "assistant", "content": "Lệ phí phúc khảo là 50.000 đồng một môn [1]…",
-  "provider": "Groq", "model": "llama-3.3-70b-versatile",          // the platform that really answered
+  "provider": "Groq", "model": "qwen/qwen3.8-27b",          // the platform that really answered
   "sources": [{ "documentId": 3, "documentName": "quy-che-thi-mau.md", "chunkIndex": 2,
                 "score": 0.812, "method": "vector", "snippet": "…" }],   // method: "vector" or "keyword"
   "createdAt": "2026-11-08T10:00:00",

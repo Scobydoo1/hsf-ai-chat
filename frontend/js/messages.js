@@ -133,7 +133,7 @@ function sourcesHtml(sources) {
         </details>`;
 }
 
-/** "Groq · llama-3.3-70b-versatile · 2.4 s · searched 2 docs" (on a narrow screen it wraps only at the dots) */
+/** "Groq · qwen/qwen3.8-27b · 2.4 s · searched 2 docs" (on a narrow screen it wraps only at the dots) */
 function answerMeta(m) {
     return [
         m.provider,

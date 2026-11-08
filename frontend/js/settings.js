@@ -11,7 +11,7 @@ const PRESETS = {
         embeddingModel: '', keyUrl: 'https://console.anthropic.com/settings/keys',
         note: 'Claude has no embeddings API: keep another platform ticked for embeddings.' },
     groq: { label: 'Groq (free tier)', name: 'Groq', type: 'OPENAI_COMPATIBLE', baseUrl: 'https://api.groq.com/openai/v1',
-        model: 'llama-3.3-70b-versatile', embeddingModel: '', keyUrl: 'https://console.groq.com/keys',
+        model: 'qwen/qwen3.8-27b', embeddingModel: '', keyUrl: 'https://console.groq.com/keys',
         note: 'Groq has no embeddings: keep another platform ticked for embeddings.' },
     ollama: { label: 'Ollama (runs on your PC)', name: 'Ollama (local)', type: 'OPENAI_COMPATIBLE', baseUrl: 'http://localhost:11434/v1',
         model: 'llama3.2', embeddingModel: 'nomic-embed-text', keyUrl: 'https://ollama.com/download',
