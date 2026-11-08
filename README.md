@@ -24,7 +24,7 @@ You need **JDK 21 or newer** (IntelliJ can download one: *File → Project Struc
    - **A. AiChatApplication (H2, no setup)** – recommended. The data is kept in `backend/data/` (delete it to start
      fresh); tables at http://localhost:8080/h2-console (JDBC URL `jdbc:h2:file:./data/aichat`, user `sa`, no password).
    - **B. AiChatApplication (local SQL Server)** – run [backend/database/create-database.sql](backend/database/create-database.sql)
-     once in SSMS; set `DB_PASSWORD` in the run configuration if your `sa` password is not `12345`.
+     once in SSMS; set `DB_PASSWORD` in the run configuration if your `sa` password is not `123`.
 
    It is ready when the log says `Started AiChatApplication`: http://localhost:8080/api/status shows `"status":"ok"`.
 3. Open `frontend/index.html` in IntelliJ and click a browser icon in the top-right corner of the editor (or right-click

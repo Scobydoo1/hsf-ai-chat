@@ -78,7 +78,7 @@ Pick a run configuration in the top-right corner of IntelliJ and press ▶:
 | Run configuration | Database | Setup |
 |-------------------|----------|-------|
 | **AiChatApplication (H2, no setup)** (recommended) | H2 file `backend/data/aichat.mv.db` | none. The data survives a restart; delete `backend/data/` to start fresh |
-| **AiChatApplication (local SQL Server)** | SQL Server `AiChatDB` | run `backend/database/create-database.sql` once in SSMS. If your `sa` password is not `12345`: *Run → Edit Configurations → Environment variables* → `DB_PASSWORD=yourPassword` |
+| **AiChatApplication (local SQL Server)** | SQL Server `AiChatDB` | run `backend/database/create-database.sql` once in SSMS. If your `sa` password is not `123`: *Run → Edit Configurations → Environment variables* → `DB_PASSWORD=yourPassword` |
 
 The H2 configuration only sets `SPRING_PROFILES_ACTIVE=h2` (file `application-h2.properties`) and uses `backend/` as
 the working directory. It is ready when the log says `Started AiChatApplication`; <http://localhost:8080/api/status>
@@ -316,7 +316,7 @@ turns `[1]` or `[1, 2]` into buttons. Clicking one opens the sources and flashes
 | Variable | Local default | On Render |
 |----------|---------------|-----------|
 | `SPRING_PROFILES_ACTIVE` | `h2` in **AiChatApplication (H2, no setup)**; none = SQL Server | `prod` |
-| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | SQL Server `AiChatDB`, `sa`, `12345` (not used by `h2`) | Neon JDBC URL, user, password |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | SQL Server `AiChatDB`, `sa`, `123` (not used by `h2`) | Neon JDBC URL, user, password |
 | `APP_PASSWORD` | empty = no password | **set it** |
 | `APP_SECRET_KEY` | built-in dev value | **set a long random string, and never change it** |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:*,http://127.0.0.1:*` | `https://your-app.vercel.app` |
